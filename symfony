@@ -1,0 +1,59 @@
+#!/bin/bash
+
+_console()
+{
+    local cur appcmd appxml command WORDS
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    appcmd="${COMP_WORDS[0]}"
+    appxml=/tmp/${appcmd##*/}.xml
+
+    # cache the console xml for a day, as the command could be slower than wanted
+    if [ -e "$appxml" ]; then
+        find "$appxml" -mtime +1 -delete
+    fi
+    if [ ! -e "$appxml" ]; then
+        "$appcmd" list --xml < /dev/null > "$appxml"
+    fi
+
+    # find the console command executed, taking into account help should have a command after it
+    commandindex=0
+    for (( I=1; I<=COMP_CWORD; I++)); do
+        case "${COMP_WORDS[I]}" in
+          -*) ;;
+          *)
+            if [ -z "$command" -o "$command" = "help" ]; then
+              command="${COMP_WORDS[I]}"
+              commandindex=$I
+            fi ;;
+        esac
+    done
+
+    case "${cur}" in
+      -*)
+        # current completion is an option, complete with the current command's options if available
+        if [ -n "$command" ]; then
+            WORDS=`php -r '$e = new SimpleXmlElement("'$appxml'", 0, true); $q = "/symfony/commands/command[@id=\"'$command'\"]/options/option/"; $r = $e->xpath($q."@name|".$q."@shortcut"
+); if ($r) echo join("\n", $r);' < /dev/null`
+            COMPREPLY=( $(compgen -W "${WORDS}" -- ${cur}) )
+            return 0
+        fi
+        ;;
+      *)
+        # current completion is something else, give it command completion if its position is on or before the found command
+        if [ $commandindex -ge $COMP_CWORD ]; then
+            WORDS=`php -r '$e = new SimpleXmlElement("'$appxml'", 0, true); $r = $e->xpath("/symfony/commands/command/@id"); if ($r) echo join("\n", $r);' < /dev/null`
+            COMPREPLY=( $(compgen -W "${WORDS}" -- ${cur}) )
+            return 0
+        fi
+        ;;
+    esac
+
+    # otherwise, fallback to standard completion
+    COMPREPLY=( $(compgen -f -- ${cur}) )
+    return 0
+}
+
+complete -F _console Symfony
+complete -F _console console
+COMP_WORDBREAKS=${COMP_WORDBREAKS//:} 
