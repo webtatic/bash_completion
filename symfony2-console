@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright 2011 Andy Thompson <andy@webtatic.com>
+# License New BSD
 
 _console()
 {
